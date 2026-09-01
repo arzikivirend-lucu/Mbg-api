@@ -51,16 +51,7 @@ curl -X POST https://api-kamu.vercel.app/v1/chat/completions \
 Untuk streaming, set `"stream": true` — response-nya Server-Sent Events, bisa
 langsung dikonsumsi `EventSource` atau `fetch` + `ReadableStream` di frontend.
 
-### Halaman signup — pengguna dapat API key sendiri
-
-Buka `https://api-kamu.vercel.app/signup.html` — form nama + email, klik "Dapatkan
-API key", key langsung muncul (plan `free`, 100 req/hari). Tidak butuh admin secret.
-Proteksi dasar sudah ada: 1 email hanya dapat 1 key (signup ulang balikin key yang
-sama), dan maksimal 5 percobaan signup per alamat IP per hari.
-
-Endpoint di baliknya: `POST /v1/signup` dengan body `{ "name": "...", "email": "..." }`.
-
-### Bikin API key publik (admin only, plan bebas)
+### Bikin API key publik (admin only)
 
 ```bash
 curl -X POST https://api-kamu.vercel.app/v1/admin/keys \
@@ -114,12 +105,36 @@ curl https://api-kamu.vercel.app/v1/images/generations/xxx \
 
 Butuh `DEAPI_API_KEY` di environment variables.
 
+### Web search (Tavily) di dalam chat completions
+
+`/v1/chat/completions` sekarang bisa menyisipkan hasil pencarian web (Tavily)
+sebagai konteks tambahan sebelum menjawab — port dari pola `needsWebSearch`/
+`searchWeb` di server.js lama, plus opsi eksplisit lewat body request:
+
+- Default (tanpa field `web_search`): otomatis search kalau pesan terakhir user
+  mengandung kata kunci pemicu ("hari ini", "berita", "harga", "terbaru", dst —
+  lihat `TRIGGER_KEYWORDS` di `src/lib/tavily.js`).
+- `"web_search": true` — paksa search apapun isi pesannya.
+- `"web_search": false` — matikan sama sekali, meski ada kata kunci pemicu.
+
+```bash
+curl -X POST https://api-kamu.vercel.app/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -H "x-internal-secret: <INTERNAL_API_SECRET>" \
+  -d '{
+    "model": "genius-v2.5",
+    "messages": [{ "role": "user", "content": "Berita AI terbaru hari ini apa?" }],
+    "web_search": true
+  }'
+```
+
+Respons non-streaming punya field tambahan `"web_search_used": true/false`.
+Untuk streaming, cek header response `X-Web-Search-Used`. Kalau `TAVILY_API_KEY`
+belum di-set atau request ke Tavily gagal, chat tetap lanjut jalan tanpa
+konteks pencarian (tidak bikin request gagal).
+
 ## Yang belum termasuk (kasih tahu kalau mau ditambahkan)
 
-- **Web search** (Tavily, seperti di `needsWebSearch`/`searchWeb` di server.js kamu)
-  — belum dipindah ke platform API ini; saat ini masih logic khusus di server chat
-  lama. Bisa ditambahkan sebagai bagian dari `/v1/chat/completions` atau endpoint
-  terpisah kalau mau.
 - **Ingatan AI / memory extraction** (endpoint `/api/memory/extract` di server.js
   lama, yang menyimpan fakta pengguna di localStorage klien) — juga belum dipindah
   ke sini. Bisa ditambahkan sebagai `/v1/memory/extract` kalau kamu mau API publik
