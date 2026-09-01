@@ -45,3 +45,33 @@ async function rateLimit(req, res, next) {
 }
 
 module.exports = { rateLimit, PLAN_LIMITS };
+
+// Limiter terpisah & lebih ketat untuk POST /v1/signup (publik, tanpa API key)
+// supaya endpoint ini tidak bisa dipakai buat generate key massal / spam.
+// Dikunci per-IP, bukan per-key, karena di titik ini user belum punya key.
+const SIGNUP_LIMIT_PER_IP_PER_DAY = 5;
+
+async function signupRateLimit(req, res, next) {
+  const ip = (req.headers["x-forwarded-for"] || req.socket.remoteAddress || "unknown").split(",")[0].trim();
+  const today = new Date().toISOString().slice(0, 10);
+  const counterKey = `usage:signup:${ip}:${today}`;
+
+  try {
+    const count = await redis.incrWithExpire(counterKey, ONE_DAY_SECONDS);
+    if (count > SIGNUP_LIMIT_PER_IP_PER_DAY) {
+      return res.status(429).json({
+        error: {
+          message: "Terlalu banyak percobaan signup dari alamat ini. Coba lagi besok.",
+          type: "rate_limit_error"
+        }
+      });
+    }
+  } catch (e) {
+    // Redis lagi down — jangan block signup, cukup log.
+    console.error("Signup rate limit check gagal:", e.message);
+  }
+
+  next();
+}
+
+module.exports.signupRateLimit = signupRateLimit;

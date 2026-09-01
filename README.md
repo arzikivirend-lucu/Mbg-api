@@ -51,6 +51,25 @@ curl -X POST https://api-kamu.vercel.app/v1/chat/completions \
 Untuk streaming, set `"stream": true` — response-nya Server-Sent Events, bisa
 langsung dikonsumsi `EventSource` atau `fetch` + `ReadableStream` di frontend.
 
+### Signup publik (self-serve, gratis, tanpa admin secret)
+
+Ini yang dipanggil form "Dapatkan API key" di website (mis. `signup.html`) —
+beda dari endpoint admin di atas, endpoint ini **tidak butuh `x-admin-secret`**,
+cukup nama + email, langsung dapat key plan `free`. Dibatasi 5 percobaan/hari
+per IP biar tidak disalahgunakan, dan satu email cuma boleh generate satu key.
+
+```bash
+curl -X POST https://api-kamu.vercel.app/v1/signup \
+  -H "Content-Type: application/json" \
+  -d '{ "name": "Budi", "email": "budi@example.com" }'
+# -> { "api_key": "mbg_live_xxxxxxxx", "plan": "free", "note": "Simpan key ini sekarang..." }
+```
+
+Kalau email sudah pernah dipakai, balikannya `409` dengan pesan bahwa key tidak
+ditampilkan ulang. Arahkan fetch di `signup.html` kamu ke endpoint ini (path
+`/v1/signup`, method `POST`, body `{ name, email }`) — sebelumnya error
+"Endpoint tidak ditemukan" muncul karena endpoint ini memang belum ada.
+
 ### Bikin API key publik (admin only)
 
 ```bash

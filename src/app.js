@@ -3,13 +3,14 @@ const express = require("express");
 const cors = require("cors");
 
 const { requireAuth } = require("./middleware/auth");
-const { rateLimit } = require("./middleware/rateLimit");
+const { rateLimit, signupRateLimit } = require("./middleware/rateLimit");
 
 const chatRoutes = require("./routes/chat");
 const modelsRoutes = require("./routes/models");
 const keysRoutes = require("./routes/keys");
 const usageRoutes = require("./routes/usage");
 const imagesRoutes = require("./routes/images");
+const signupRoutes = require("./routes/signup");
 
 const app = express();
 
@@ -34,6 +35,10 @@ app.use("/v1/models", requireAuth, modelsRoutes);
 app.use("/v1/chat", requireAuth, rateLimit, chatRoutes);
 app.use("/v1/images/generations", requireAuth, rateLimit, imagesRoutes);
 app.use("/v1/usage", requireAuth, usageRoutes);
+
+// Endpoint publik buat user generate API key sendiri (plan free) — tanpa
+// x-admin-secret, tapi dibatasi per-IP supaya tidak disalahgunakan.
+app.use("/v1/signup", signupRateLimit, signupRoutes);
 
 // Endpoint admin (bikin/cabut API key) — pakai secret sendiri, bukan requireAuth biasa
 app.use("/v1/admin/keys", keysRoutes);
